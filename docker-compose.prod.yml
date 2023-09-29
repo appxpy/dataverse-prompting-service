@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  backend:
+    image: ghcr.io/appxpy/dataverse/backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: gunicorn backend.wsgi:application --bind 0.0.0.0:8080
+    volumes:
+      - ~/server/proxy/data/html/api.dataverse.appxpy.com/static/:/home/app/web/static:rw
+      - ~/server/proxy/data/html/api.dataverse.appxpy.com/media/:/home/app/web/media:rw
+    expose:
+      - 8080
+    env_file:
+      - ./.env.backend.prod
+    depends_on:
+      - db
+    networks:
+      - proxy
+      - default
+  db:
+    image: postgres:13.0-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - ./.env.db.prod
+  front:
+    image: ghcr.io/appxpy/dataverse/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_BACKEND_URL=https://api.dataverse.appxpy.com
+    command: node server.js
+    expose:
+      - 3000
+    networks:
+      - proxy
+      - default
+    environment:
+      - VIRTUAL_HOST=dataverse.appxpy.com
+      - VIRTUAL_PORT=3000
+      - NETWORK=proxy
+      - LETSENCRYPT_HOST=dataverse.appxpy.com
+
+volumes:
+  postgres_data:
+
+networks:
+  proxy:
+    external: true

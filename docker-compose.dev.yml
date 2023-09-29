@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: gunicorn backend.wsgi:application --bind 0.0.0.0:8080 --log-level=debug
+    volumes:
+      - ./backend/:/usr/src/app/
+    ports:
+      - 8080:8080
+    env_file:
+      - ./.env.backend.dev
+  front:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=http://localhost:8080
+    volumes:
+      - ./frontend/src/:/app/src/
+    command: npm run dev
+    ports:
+      - 3000:3000
+    depends_on:
+      - backend
+
+volumes:
+  node_modules:

@@ -1,0 +1,48 @@
+stages:
+  - linting
+  - test
+  - deploy
+
+linting_backend:
+  stage: linting
+  image: python:3.11.4-alpine
+  before_script:
+    - apk update && apk add libffi-dev postgresql-dev gcc python3-dev musl-dev
+  script:
+    - cd backend
+    - pip install -r requirements.txt
+    - flake8 --ignore=F401,E501 --exclude .venv
+    - mypy .
+
+linting_frontend:
+  stage: linting
+  image: node:20
+  script:
+    - cd frontend
+    - npm install
+    - npm run lint
+
+test_backend:
+  stage: test
+  image: python:3.11.4-alpine
+  before_script:
+    - apk update && apk add libffi-dev postgresql-dev gcc python3-dev musl-dev
+  script:
+    - cd backend
+    - pip install -r requirements.txt
+    - python manage.py test
+
+build_and_deploy:
+  image: alpine:latest
+  stage: deploy
+  before_script:
+    - apk update && apk add openssh
+    - mkdir ~/.ssh
+    - touch ~/.ssh/id_rsa
+    - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+    - chmod 600 ~/.ssh/id_rsa
+    - ssh-keyscan $SERVER_IP >> ~/.ssh/known_hosts
+  script:
+    - ssh $SERVER_USER@$SERVER_IP 'cd dataverse-prompting-service && git pull && docker-compose -f docker-compose.prod.yml build && docker-compose -f docker-compose.prod.yml down && docker-compose -f docker-compose.prod.yml up -d'
+  only:
+    - main
